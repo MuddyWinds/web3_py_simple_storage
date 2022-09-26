@@ -1,7 +1,7 @@
 import json
 from web3 import Web3
 from solcx import compile_standard, install_solc
-from private_keys import private_key_01
+from env import private_key_01
 
 
 with open("./SimpleStorage.sol", "r") as file:
@@ -37,9 +37,9 @@ bytecode = compiled_sol["contracts"]["SimpleStorage.sol"]["SimpleStorage"]["evm"
 abi = compiled_sol["contracts"]["SimpleStorage.sol"]["SimpleStorage"]["abi"]
 
 # For connecting to Ganache
-w3 = Web3(Web3.HTTPProvider("http://127.0.0.1:7545"))
+w3 = Web3(Web3.HTTPProvider("http://127.0.0.1:8545"))
 chain_id = 1337
-my_address = "0x40D4C2F5e13B299a71df365511C63c3E5151819e"
+my_address = "0x90F8bf6A479f320ead074411a4B0e7944Ea8c9C1"
 private_key = private_key_01
 
 # Create the contract in python
@@ -57,3 +57,30 @@ transaction = SimpleStorage.constructor().buildTransaction(
         "nonce": nonce,
     }
 )
+
+signed_txn = w3.eth.account.sign_transaction(transaction, private_key=private_key)
+
+# Send this signed transaction
+tx_hash = w3.eth.send_raw_transaction(signed_txn.rawTransaction)
+tx_receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
+
+# Working with Contract, Contract ABI & Contract Address needed
+simple_storage = w3.eth.contract(address=tx_receipt.contractAddress, abi=abi)
+
+# Call -> Simulate making a call and getting a return value. No state change
+# Transact -> Actual state change made
+
+# Initial value of favorite number
+print(simple_storage.functions.retrieve().call())
+print("updating Contract...")
+store_transaction = simple_storage.functions.store(15).buildTransaction(
+    {"chainId": chain_id, "from": my_address, "nonce": nonce + 1}
+)
+
+signed_store_txn = w3.eth.account.sign_transaction(
+    store_transaction, private_key=private_key
+)
+
+send_store_tx = w3.eth.send_raw_transaction(signed_store_txn.rawTransaction)
+tx_receipt = w3.eth.wait_for_transaction_receipt(send_store_tx)
+print("Updated")
